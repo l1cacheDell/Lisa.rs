@@ -1,4 +1,6 @@
-<img src="docs/bg.png" alt="background" style="width: 800px; height: 150px; overflow: hidden;object-fit: cover;">
+<div style="width: 560px; height: 100px; overflow: hidden;">
+    <img src="docs/bg.png" alt="描述" style="width: 100%; height: 100%; object-fit: cover;">
+</div>
 
 # Quick Start
 
