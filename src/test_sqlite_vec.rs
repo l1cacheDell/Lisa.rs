@@ -53,7 +53,7 @@ pub async fn launch_sqlite_vec(openai_client: &Client, embedding_model: &str) ->
     }
 
     // Initialize SQLite connection
-    let conn = Connection::open("vector_store.db").await?;
+    let conn = Connection::open("data/vector_store.db").await?;
 
     // Select the embedding model and generate our embeddings
     let bge_v3_ndim = 1024;
