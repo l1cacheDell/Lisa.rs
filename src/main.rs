@@ -7,6 +7,9 @@ use crate::test_completion::create_completion;
 pub mod test_sqlite_vec;
 use crate::test_sqlite_vec::launch_sqlite_vec;
 
+pub mod db_schemas;
+pub mod agent_impl;
+
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
 use env_logger::Env;
