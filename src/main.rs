@@ -1,27 +1,51 @@
 use dotenvy::dotenv;
 use rig::providers::openai::Client;
 
-pub mod test_completion;
-use crate::test_completion::create_completion;
-
-pub mod test_sqlite_vec;
-use crate::test_sqlite_vec::launch_sqlite_vec;
-
 pub mod db_schemas;
 pub mod agent_impl;
+pub mod web_model;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
 use env_logger::Env;
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+#[get("/api/ping")]
+async fn ping() -> impl Responder {
+    HttpResponse::Ok().body("You should use Rust.")
 }
 
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
+#[post("/api/chat")]
+async fn chat(json: web::Json<web_model::ChatRequest>) -> actix_web::Result<impl Responder> {
+    let user_id = &json.user_id;
+    let prompt = &json.content;
+
+    let response = web_model::ChatResponse {
+        status: "success".to_string(),
+        agent_response: "I don't have a response for that yet.".to_string(),
+    };
+    Ok(web::Json(response))
+}
+
+#[post("/api/store_drift_bottle")]
+async fn store_drift_bottle(json: web::Json<web_model::StoreDriftBottleRequest>) -> actix_web::Result<impl Responder> {
+    let wallet = &json.wallet;
+    let title = &json.title;
+    let drift_bottle_content = &json.content;
+
+    let mut response = web_model::GeneralReponse {
+        status: "success".to_string()
+    };
+
+    // store this drift bottle in DB
+    // currently we will implement the basic connection method, no ConnPool implemented.
+
+    db_schemas::store_drift_vec(&wallet, &title, &drift_bottle_content).await.unwrap_or_else(|e| {
+        println!("Error: {}", e);
+        response = web_model::GeneralReponse {
+            status: format!("Error: {}", e)
+        };
+    });
+    Ok(web::Json(response))
 }
 
 #[actix_web::main]
@@ -44,18 +68,18 @@ async fn main() -> std::io::Result<()> {
     let openai_client = Client::from_url(&api_key, &base_url);
 
     let embedding_model_name = "BAAI/bge-large-en-v1.5";
-    let _response2 = launch_sqlite_vec(&openai_client, &embedding_model_name).await.unwrap();
 
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
     HttpServer::new(|| {
         App::new()
-            .service(hello)
-            .service(echo)
+            .service(ping)
+            .service(chat)
+            .service(store_drift_bottle)
             .wrap(Logger::default())
             .wrap(Logger::new("%a"))
     })
-    .workers(4)
+    .workers(2)
     .bind((IPADDRESS, PORT))?
     .run()
     .await

@@ -1,10 +1,12 @@
+use std::marker::PhantomData;
+
 use crate::db_schemas::DriftBottle;
 use tokio_rusqlite::Connection;
 use rig::{
-    agent::Agent, embeddings::EmbeddingsBuilder, providers::openai::{Client, CompletionModel, EmbeddingModel}, vector_store::{self, VectorStoreIndex}, Embed, OneOrMany
+    agent::Agent, providers::openai::{Client, CompletionModel, EmbeddingModel}, vector_store::{self, VectorStoreIndex}, Embed, OneOrMany
 };
 
-use rig_sqlite::{SqliteVectorIndex, SqliteVectorStore, SqliteVectorStoreTable};
+use rig_sqlite::{SqliteVectorStore, SqliteVectorStoreTable};
 
 pub struct RetrivalAgent<T: SqliteVectorStoreTable + 'static> {
     openai_api_key: String,
@@ -15,7 +17,7 @@ pub struct RetrivalAgent<T: SqliteVectorStoreTable + 'static> {
     embedding_ndim: usize,
     openai_client: Client,
     agent: Agent<CompletionModel>,
-    index: SqliteVectorIndex<EmbeddingModel, T>,
+    phantom: PhantomData<T>
 }
 
 impl<T: SqliteVectorStoreTable + 'static> RetrivalAgent<T> {
@@ -29,10 +31,12 @@ impl<T: SqliteVectorStoreTable + 'static> RetrivalAgent<T> {
     ) -> Result<Self, anyhow::Error> {
         let conn = Connection::open(&sqlite_vec_db).await?;
         let openai_client = Client::from_url(&openai_api_key, &base_url);
-        let agent = openai_client.agent(&model_name).build();
         let embedding_model = openai_client.embedding_model_with_ndims(&embedding_model_name, embedding_ndim);
         let vector_store: SqliteVectorStore<EmbeddingModel, T> = SqliteVectorStore::new(conn, &embedding_model).await?;
-        let index = vector_store.index(embedding_model);
+        // let index = vector_store.index(embedding_model);
+        let agent = openai_client.agent(&model_name)
+            .dynamic_context(2, vector_store.index(embedding_model))  // `sample` means the number of top matched documents added to the agent context
+            .build();
 
         Ok(Self {
             openai_api_key,
@@ -43,7 +47,7 @@ impl<T: SqliteVectorStoreTable + 'static> RetrivalAgent<T> {
             embedding_ndim,
             openai_client,
             agent,
-            index,
+            phantom: PhantomData,
         })
 
     }
