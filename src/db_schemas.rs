@@ -69,13 +69,42 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
         .parse()?;
 
     // start building
+    // check if this document has already been stored
     let conn = Connection::open(&db_path).await?;
+    let wallet_clone = wallet.to_string();
+    let title_clone = format!("{}-{}", title.to_string(), 0);
+
+    let stored_repeated = conn.call(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT * FROM drift_bottles WHERE wallet = ? AND title = ?"
+        )?;
+
+        let searched_docs = stmt.query_map([wallet_clone, title_clone], |row| {
+            Ok(DriftBottle {
+                id: row.get(0)?,
+                wallet: row.get(1)?,
+                title: row.get(2)?,
+                content: row.get(3)?
+            })
+        })?
+        .collect::<std::result::Result<Vec<DriftBottle>, rusqlite::Error>>()?;
+
+        Ok(searched_docs)
+    })
+    .await?;
+
+    if stored_repeated.len() > 0 {
+        return Err(anyhow::Error::msg("This document has already been stored"));
+    }
+
+    // store this doc
     let openai_client = Client::from_url(&openai_api_key, &base_url);
     let embedding_model = openai_client.embedding_model_with_ndims(&embedding_model_name, embedding_ndim);
     let vector_store: SqliteVectorStore<rig::providers::openai::EmbeddingModel, DriftBottle> = SqliteVectorStore::new(conn, &embedding_model).await?;
 
     let mut docs: Vec<DriftBottle> = Vec::new();
     let mut len_cnt = 0;
+    let mut passage_cnt = 0;
 
     loop {
         if len_cnt >= content.len() {
@@ -87,10 +116,11 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
         docs.push(DriftBottle { 
             id: new_id.to_string(), 
             wallet: wallet.to_string(), 
-            title: title.to_string(), 
+            title: format!("{}-{}", title, passage_cnt), 
             content: content_part.to_string() 
         });
         len_cnt = end;
+        passage_cnt += 1;
     }
 
     let embeddings = EmbeddingsBuilder::new(embedding_model)

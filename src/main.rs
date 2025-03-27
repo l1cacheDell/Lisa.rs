@@ -8,10 +8,15 @@ pub mod web_model;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
 use env_logger::Env;
+use rusqlite::ffi::sqlite3_auto_extension;
+use sqlite_vec::sqlite3_vec_init;
 
 #[get("/api/ping")]
-async fn ping() -> impl Responder {
-    HttpResponse::Ok().body("You should use Rust.")
+async fn ping() -> actix_web::Result<impl Responder> {
+
+    Ok(web::Json(web_model::GeneralReponse {
+        status: "pong".to_string()
+    }))
 }
 
 #[post("/api/chat")]
@@ -40,7 +45,6 @@ async fn store_drift_bottle(json: web::Json<web_model::StoreDriftBottleRequest>)
     // currently we will implement the basic connection method, no ConnPool implemented.
 
     db_schemas::store_drift_vec(&wallet, &title, &drift_bottle_content).await.unwrap_or_else(|e| {
-        println!("Error: {}", e);
         response = web_model::GeneralReponse {
             status: format!("Error: {}", e)
         };
@@ -52,22 +56,14 @@ async fn store_drift_bottle(json: web::Json<web_model::StoreDriftBottleRequest>)
 async fn main() -> std::io::Result<()> {
     // load environment variables from.env file
     dotenv().ok();
-    let api_key: String = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
-    let base_url: String = std::env::var("BASE_URL").expect("BASE_URL not set");
-    let model_name: String = std::env::var("MODEL_NAME").expect("MODEL_NAME not set");
 
-    let prompt = "What do you think of Trump?";
+    unsafe {
+        sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
+    }
 
     const IPADDRESS: &str = "localhost";
     const PORT: u16 = 8080;
     println!("Server will be listening on http://{}:{}", IPADDRESS, PORT);
-
-    // let response_from_qwen = create_completion(&api_key, &base_url, &model_name, &prompt).await;
-    // println!("{model_name}: {response_from_qwen}");
-
-    let openai_client = Client::from_url(&api_key, &base_url);
-
-    let embedding_model_name = "BAAI/bge-large-en-v1.5";
 
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
