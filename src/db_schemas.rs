@@ -19,11 +19,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 //
 #[derive(Embed, Clone, Debug, Deserialize)]
 pub struct DriftBottle {
-    id: String,
-    wallet: String,
-    title: String,
+    pub id: String,
+    pub wallet: String,
+    pub title: String,
     #[embed]
-    content: String,
+    pub content: String,
 }
 
 impl SqliteVectorStoreTable for DriftBottle {
@@ -57,15 +57,45 @@ impl SqliteVectorStoreTable for DriftBottle {
 //
 //  ==================== High-Level Database Schema ====================
 //
-#[derive(Embed, Clone, Debug, Deserialize)]
-pub struct BottleSummary {
-    id: String,
-    wallet: String,
-    title: String,
-    keywords: String,
-    #[embed]
-    summary: String,
-}
+// #[derive(Embed, Clone, Debug, Deserialize)]
+// pub struct BottleSummary {
+//     id: String,
+//     wallet: String,
+//     title: String,
+//     keywords: String,
+//     #[embed]
+//     summary: String,
+// }
+
+// impl SqliteVectorStoreTable for BottleSummary {
+//     fn name() -> &'static str {
+//         "bottle_summaries"
+//     }
+
+//     fn schema() -> Vec<Column> {
+//         vec![
+//             Column::new("id", "TEXT PRIMARY KEY"),
+//             Column::new("wallet", "TEXT"),
+//             Column::new("title", "TEXT"),
+//             Column::new("keywords", "TEXT"),
+//             Column::new("summary", "TEXT"),
+//         ]
+//     }
+
+//     fn id(&self) -> String {
+//         self.id.clone()
+//     }
+
+//     fn column_values(&self) -> Vec<(&'static str, Box<dyn ColumnValue>)> {
+//         vec![
+//             ("id", Box::new(self.id.clone())),
+//             ("wallet", Box::new(self.wallet.clone())),
+//             ("title", Box::new(self.title.clone())),
+//             ("keywords", Box::new(self.keywords.clone())),
+//             ("summary", Box::new(self.summary.clone())),
+//         ]
+//     }
+// }
 
 // public storage zone
 static GLOBAL_ID: AtomicUsize = AtomicUsize::new(0);
@@ -76,19 +106,42 @@ pub fn get_next_id() -> usize {
 
 const DOCUMENT_STRIDE: usize = 510;
 
+pub struct VectorDBFromEnv {
+    pub db_path: String,
+    pub openai_api_key: String,
+    pub base_url: String,
+    pub embedding_model_name: String,
+    pub embedding_ndim: usize
+}
+
+impl VectorDBFromEnv {
+    pub async fn new() -> Result<Self, anyhow::Error> {
+        let db_path = std::env::var("DB_PATH").unwrap_or("data/vector_store.db".to_string());
+        let openai_api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+        let base_url: String = std::env::var("BASE_URL").expect("BASE_URL not set");
+        let embedding_model_name: String = std::env::var("EMBEDDING_MODEL_NAME").expect("MODEL_NAME not set");
+        let embedding_ndim = std::env::var("EMBEDDING_MODEL_NDIM")
+            .unwrap_or_else(|_| "1024".to_string())
+            .parse()?;
+
+        Ok(Self {
+            db_path: db_path,
+            openai_api_key: openai_api_key,
+            base_url: base_url,
+            embedding_model_name: embedding_model_name,
+            embedding_ndim: embedding_ndim
+        })
+    }
+}
+
 pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result<(), anyhow::Error>{
     // load from env vars
-    let db_path = std::env::var("DB_PATH").unwrap_or("data/vector_store.db".to_string());
-    let openai_api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
-    let base_url: String = std::env::var("BASE_URL").expect("BASE_URL not set");
-    let embedding_model_name: String = std::env::var("EMBEDDING_MODEL_NAME").expect("MODEL_NAME not set");
-    let embedding_ndim = std::env::var("EMBEDDING_MODEL_NDIM")
-        .unwrap_or_else(|_| "1024".to_string())
-        .parse()?;
+
+    let vcdb_from_env = VectorDBFromEnv::new().await?;
 
     // start building
     // check if this document has already been stored
-    let conn = Connection::open(&db_path).await?;
+    let conn = Connection::open(&vcdb_from_env.db_path).await?;
     let wallet_clone = wallet.to_string();
     let title_clone = format!("{}-{}", title.to_string(), 0);
 
@@ -122,8 +175,9 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
     }
 
     // store this doc
-    let openai_client = Client::from_url(&openai_api_key, &base_url);
-    let embedding_model = openai_client.embedding_model_with_ndims(&embedding_model_name, embedding_ndim);
+    let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
+    let embedding_model = openai_client.embedding_model_with_ndims(&vcdb_from_env.embedding_model_name, 
+        vcdb_from_env.embedding_ndim);
     let vector_store: SqliteVectorStore<rig::providers::openai::EmbeddingModel, DriftBottle> = SqliteVectorStore::new(conn, &embedding_model).await?;
 
     // Notice: the length of the passage, is not the length of the string.

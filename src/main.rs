@@ -4,6 +4,7 @@ use rig::providers::openai::Client;
 pub mod db_schemas;
 pub mod agent_impl;
 pub mod web_model;
+pub mod test_sqlite_vec;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
