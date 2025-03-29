@@ -10,9 +10,13 @@ use serde::Deserialize;
 use sqlite_vec::sqlite3_vec_init;
 use tokio_rusqlite::Connection;
 use rig::embeddings::EmbeddingModel;
+use regex::Regex;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+//
+//  ==================== Low-Level Database Schema ====================
+//
 #[derive(Embed, Clone, Debug, Deserialize)]
 pub struct DriftBottle {
     id: String,
@@ -50,6 +54,20 @@ impl SqliteVectorStoreTable for DriftBottle {
     }
 }
 
+//
+//  ==================== High-Level Database Schema ====================
+//
+#[derive(Embed, Clone, Debug, Deserialize)]
+pub struct BottleSummary {
+    id: String,
+    wallet: String,
+    title: String,
+    keywords: String,
+    #[embed]
+    summary: String,
+}
+
+// public storage zone
 static GLOBAL_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub fn get_next_id() -> usize {
@@ -60,7 +78,7 @@ const DOCUMENT_STRIDE: usize = 510;
 
 pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result<(), anyhow::Error>{
     // load from env vars
-    let db_path = std::env::var("DB_PATH").expect("DB_PATH not set");
+    let db_path = std::env::var("DB_PATH").unwrap_or("data/vector_store.db".to_string());
     let openai_api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
     let base_url: String = std::env::var("BASE_URL").expect("BASE_URL not set");
     let embedding_model_name: String = std::env::var("EMBEDDING_MODEL_NAME").expect("MODEL_NAME not set");
@@ -91,7 +109,13 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
 
         Ok(searched_docs)
     })
-    .await?;
+    .await
+    .unwrap_or_else(|e| {
+        if e.to_string().contains("no such table") {
+            return Vec::new();  // handle error: table not created yet, so continue to store. The table and schema will be created later.
+        }
+        panic!("Error querying database: {}", e);
+    });
 
     if stored_repeated.len() > 0 {
         return Err(anyhow::Error::msg("This document has already been stored"));
@@ -102,25 +126,27 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
     let embedding_model = openai_client.embedding_model_with_ndims(&embedding_model_name, embedding_ndim);
     let vector_store: SqliteVectorStore<rig::providers::openai::EmbeddingModel, DriftBottle> = SqliteVectorStore::new(conn, &embedding_model).await?;
 
+    // Notice: the length of the passage, is not the length of the string.
+    // The granularity of the passage is word-level, not character-level.
     let mut docs: Vec<DriftBottle> = Vec::new();
-    let mut len_cnt = 0;
-    let mut passage_cnt = 0;
+    let mut start = 0;
 
-    loop {
-        if len_cnt >= content.len() {
-            break;
-        }
-        let end = std::cmp::min(len_cnt + DOCUMENT_STRIDE, content.len());
-        let content_part = &content[len_cnt..end];
+    let word_re = Regex::new(r"\b[\w\p{P}]+\b").unwrap();
+    let words: Vec<&str> = word_re.find_iter(content).map(|mat| mat.as_str()).collect();
+
+    while start < words.len() {
+        let end = std::cmp::min(start + DOCUMENT_STRIDE, words.len());
+        let content_part = &words[start..end];
         let new_id = get_next_id();
+
         docs.push(DriftBottle {
             id: new_id.to_string(), 
             wallet: wallet.to_string(), 
-            title: format!("{}-{}", title, passage_cnt), 
-            content: content_part.to_string() 
+            title: format!("{}-{}", title, docs.len()), // title-0, title-1, ...
+            content: content_part.join(" ")
         });
-        len_cnt = end;
-        passage_cnt += 1;
+
+        start = end;
     }
 
     let embeddings = EmbeddingsBuilder::new(embedding_model)

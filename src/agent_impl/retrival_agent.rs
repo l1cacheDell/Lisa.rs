@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::db_schemas::DriftBottle;
+// use crate::db_schemas::DriftBottle;
 use tokio_rusqlite::Connection;
 use rig::{
     agent::Agent, providers::openai::{Client, CompletionModel, EmbeddingModel}, vector_store::{self, VectorStoreIndex}, Embed, OneOrMany

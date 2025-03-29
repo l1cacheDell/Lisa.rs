@@ -1301,6 +1301,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe7db12097d22ec582439daf8618b8fdd1a7bef6270e9af3b1ebcd30893cf413"
 
 [[package]]
+name = "lisa"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "dotenvy",
+ "env_logger",
+ "regex",
+ "rig-core",
+ "rig-sqlite",
+ "rusqlite",
+ "serde",
+ "sqlite-vec",
+ "tokio",
+ "tokio-rusqlite",
+ "use",
+]
+
+[[package]]
 name = "litemap"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1338,24 +1357,6 @@ name = "log"
 version = "0.4.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
-
-[[package]]
-name = "lucy_agent"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "anyhow",
- "dotenvy",
- "env_logger",
- "rig-core",
- "rig-sqlite",
- "rusqlite",
- "serde",
- "sqlite-vec",
- "tokio",
- "tokio-rusqlite",
- "use",
-]
 
 [[package]]
 name = "memchr"

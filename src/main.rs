@@ -13,7 +13,6 @@ use sqlite_vec::sqlite3_vec_init;
 
 #[get("/api/ping")]
 async fn ping() -> actix_web::Result<impl Responder> {
-
     Ok(web::Json(web_model::GeneralReponse {
         status: "pong".to_string()
     }))
@@ -62,8 +61,8 @@ async fn main() -> std::io::Result<()> {
     }
 
     const IPADDRESS: &str = "localhost";
-    const PORT: u16 = 8080;
-    println!("Server will be listening on http://{}:{}", IPADDRESS, PORT);
+    let port: u16 = std::env::var("PORT").unwrap_or("8080".to_string()).parse::<u16>().expect("Invalid port number");
+    println!("Server will be listening on http://{}:{}", IPADDRESS, port);
 
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
@@ -76,7 +75,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::new("%a"))
     })
     .workers(2)
-    .bind((IPADDRESS, PORT))?
+    .bind((IPADDRESS, port))?
     .run()
     .await
 

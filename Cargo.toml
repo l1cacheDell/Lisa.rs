@@ -1,5 +1,5 @@
 [package]
-name = "lucy_agent"
+name = "lisa"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,6 +8,7 @@ actix-web = "4.10.2"
 anyhow = "1.0.97"
 dotenvy = "0.15.7"
 env_logger = "0.11.7"
+regex = "1.11.1"
 rig-core = "0.10.0"
 rig-sqlite = "0.1.7"
 rusqlite = "0.32.0"
