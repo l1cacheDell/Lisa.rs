@@ -28,13 +28,18 @@ impl<T: SqliteVectorStoreTable + 'static> RetrivalAgent<T> {
         model_name: String,
         embedding_model_name: String,
         embedding_ndim: usize,
+        sys_prompt: String,
+        max_tokens: Option<u32>,
     ) -> Result<Self, anyhow::Error> {
         let conn = Connection::open(&sqlite_vec_db).await?;
         let openai_client = Client::from_url(&openai_api_key, &base_url);
         let embedding_model = openai_client.embedding_model_with_ndims(&embedding_model_name, embedding_ndim);
         let vector_store: SqliteVectorStore<EmbeddingModel, T> = SqliteVectorStore::new(conn, &embedding_model).await?;
         // let index = vector_store.index(embedding_model);
+        let actual_max_tokens = max_tokens.unwrap_or(256);
         let agent = openai_client.agent(&model_name)
+            .preamble(&sys_prompt)
+            .max_tokens(actual_max_tokens.into())
             .dynamic_context(2, vector_store.index(embedding_model))  // `sample` means the number of top matched documents added to the agent context
             .build();
 

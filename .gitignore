@@ -1,3 +1,5 @@
 /target
 
+# important assets, not uploaded
 .env
+data/vector_store.db

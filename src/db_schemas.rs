@@ -113,7 +113,7 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
         let end = std::cmp::min(len_cnt + DOCUMENT_STRIDE, content.len());
         let content_part = &content[len_cnt..end];
         let new_id = get_next_id();
-        docs.push(DriftBottle { 
+        docs.push(DriftBottle {
             id: new_id.to_string(), 
             wallet: wallet.to_string(), 
             title: format!("{}-{}", title, passage_cnt), 
