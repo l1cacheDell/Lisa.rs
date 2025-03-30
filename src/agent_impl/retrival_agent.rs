@@ -100,7 +100,7 @@ impl Tool for RetrivalTool {
         let mut output = String::new();
         for (_i, doc) in results.iter().enumerate() {
             if doc.0 > 0.7 {
-                output.push_str(&format!("**User**: {}\n**title**: {}\n**content**: {}", doc.2.wallet, doc.2.title, doc.2.content));
+                output.push_str(&format!("**User**: {}\n**title**: {}\n**content**: {}\n", doc.2.wallet, doc.2.title, doc.2.content));
             }
         }
 

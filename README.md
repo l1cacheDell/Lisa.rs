@@ -68,6 +68,11 @@ Linux:
 $env:RUST_BACKTRACE=1; cargo run
 ```
 
-```
-I used to believe in love the way everyone does when they are young and naive as a perfect unbreakable bond that ties two people together I never thought it could fade not even a little But over the years I've come to understand that love isn't always forever Sometimes it’s just a fleeting moment in time and when that moment passes the truth we leave behind is all that remains I remember the first time I met you It was one of those encounters that felt like destiny as if the universe had conspired for our paths to cross You had that warmth in your eyes that smile that could make even the darkest of days feel bright You were my everything my best friend my lover my confidante I thought we would grow old together hand in hand through every storm and sunny day But as the years went by things began to shift It wasn’t dramatic at first It was subtle like the quiet rustling of leaves in the wind that you barely notice until one day you realize that the trees are bare Our conversations became shorter our moments of silence longer The affection we once shared began to feel like a distant memory and I couldn't help but wonder when did it all start to change At first I told myself it was just a phase Life gets in the way sometimes work stress the everyday chaos But deep down I knew it wasn’t just that It was something deeper Something neither of us were willing to face I remember the night you left It wasn't a dramatic scene there were no shouting matches no tear-filled goodbyes It was just you standing there quietly packing your things preparing to walk away You didn’t say much but I could feel the weight of your silence It hurt more than any angry words could have And as you walked out of that door I realized something love isn’t always about staying Sometimes it's about knowing when to leave The truth is love fades People grow change and sometimes they simply drift apart It’s not anyone’s fault it’s just the way things are The love we once had wasn’t enough to keep us together and neither of us had the strength to fight for it anymore But even though you left I don’t hold any resentment I’ve learned to accept the truth that sometimes people are meant to walk out of our lives and we must learn to let them go The truth that you left is a hard one to swallow but it’s a truth that has taught me more about myself than I ever expected
-```
+# Debug记录
+Rig这个Tool，做出来只会直接返回结果。需要探究一下到底怎么才能不直接返回结果。
+
+看了一下源码，Tool应该就是单纯的tool，跟python那边不一样。
+
+如果要做RAG功能，那就是直接走dynamic_context()函数；
+
+如果要做**基于RAG的其他任务**，那就是dynamic_tools(sample: usize, index, Toolset)函数。

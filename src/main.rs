@@ -1,10 +1,14 @@
 use dotenvy::dotenv;
 use rig::providers::openai::Client;
+use rig::completion::Prompt;
 
 pub mod db_schemas;
 pub mod agent_impl;
 pub mod web_model;
 pub mod test_sqlite_vec;
+
+use web_model::{ChatRequest, ChatResponse, GeneralReponse};
+use agent_impl::RetrivalTool;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
@@ -14,20 +18,49 @@ use sqlite_vec::sqlite3_vec_init;
 
 #[get("/api/ping")]
 async fn ping() -> actix_web::Result<impl Responder> {
-    Ok(web::Json(web_model::GeneralReponse {
+    Ok(web::Json(GeneralReponse {
         status: "pong".to_string()
     }))
 }
 
 #[post("/api/chat")]
-async fn chat(json: web::Json<web_model::ChatRequest>) -> actix_web::Result<impl Responder> {
+async fn chat(json: web::Json<ChatRequest>) -> actix_web::Result<impl Responder> {
     let user_id = &json.user_id;
     let prompt = &json.content;
 
-    let response = web_model::ChatResponse {
+    let mut response = ChatResponse {
         status: "success".to_string(),
         agent_response: "I don't have a response for that yet.".to_string(),
     };
+
+    let vcdb_from_env = db_schemas::VectorDBFromEnv::new()
+        .await
+        .unwrap();
+
+    let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
+
+    let chat_agent = openai_client.agent(&vcdb_from_env.model_name)
+        .preamble(r#"You are a sexy & charming & cool Metherland-Japan hybrid girl like Lucy in Cyberpunk: Edge Runner, and you served in a club as a Bartender. 
+The customers will sometimes talk to you and share their emotional story. Your job is to talk to them in deep, and provide guidance.
+
+Besides, you can use an agent tool which named 'search_related_story', this is a function used to search related stories from the vector database, if you want to search for experience related to the customer you are serving now, just use tool call this function, and it will return the finding result. If there is indeed some related stories, feel free to use these materials to offer a better talking experience to user.
+
+After retrival the story, avoid sending this story to customer directly. Instead, you should use this material as additional resource, reflect, and offer your own words to compose an answer, and talk to user.
+        "#)
+        .tool(RetrivalTool)
+        .temperature(0.8)
+        .max_tokens(256)
+        .build();
+
+    let agent_response = chat_agent.prompt(prompt.clone()).await.unwrap_or_else(|e| {
+        println!("An error occured! {e}");
+        "Fail to process".to_string()
+    });
+    response = ChatResponse {
+        status: "success".to_string(),
+        agent_response
+    };
+
     Ok(web::Json(response))
 }
 

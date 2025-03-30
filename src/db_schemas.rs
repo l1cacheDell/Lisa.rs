@@ -1,15 +1,11 @@
 use rig::{
     embeddings::EmbeddingsBuilder,
     providers::openai::Client,
-    vector_store::VectorStoreIndex,
-    Embed, OneOrMany,
+    Embed
 };
 use rig_sqlite::{Column, ColumnValue, SqliteVectorIndex, SqliteVectorStore, SqliteVectorStoreTable};
-use rusqlite::ffi::sqlite3_auto_extension;
 use serde::Deserialize;
-use sqlite_vec::sqlite3_vec_init;
 use tokio_rusqlite::Connection;
-use rig::embeddings::EmbeddingModel;
 use regex::Regex;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -111,7 +107,8 @@ pub struct VectorDBFromEnv {
     pub openai_api_key: String,
     pub base_url: String,
     pub embedding_model_name: String,
-    pub embedding_ndim: usize
+    pub embedding_ndim: usize,
+    pub model_name: String
 }
 
 impl VectorDBFromEnv {
@@ -123,13 +120,15 @@ impl VectorDBFromEnv {
         let embedding_ndim = std::env::var("EMBEDDING_MODEL_NDIM")
             .unwrap_or_else(|_| "1024".to_string())
             .parse()?;
+        let model_name = std::env::var("MODEL_NAME").expect("MODEL_NAME not set");
 
         Ok(Self {
-            db_path: db_path,
-            openai_api_key: openai_api_key,
-            base_url: base_url,
-            embedding_model_name: embedding_model_name,
-            embedding_ndim: embedding_ndim
+            db_path,
+            openai_api_key,
+            base_url,
+            embedding_model_name,
+            embedding_ndim,
+            model_name
         })
     }
 }
