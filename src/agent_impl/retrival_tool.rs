@@ -1,12 +1,10 @@
-use std::marker::PhantomData;
-
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 
 use tokio_rusqlite::Connection;
 use rig::{
     agent::Agent, providers::openai::{Client, CompletionModel, EmbeddingModel}, 
-    vector_store::{self, VectorStoreIndex}, Embed, OneOrMany
+    vector_store::{self, VectorStoreIndex}
 };
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
@@ -112,57 +110,52 @@ impl Tool for RetrivalTool {
     }
 }
     
-
-
-
-// pub struct RetrivalAgent<T: SqliteVectorStoreTable + 'static> {
-//     openai_api_key: String,
-//     base_url: String,
-//     sqlite_vec_db: String,
-//     model_name: String,
-//     embedding_model_name: String,
-//     embedding_ndim: usize,
-//     openai_client: Client,
-//     agent: Agent<CompletionModel>,
-//     phantom: PhantomData<T>
+// pub struct RetrivalAgent {
+//     agent: Agent<CompletionModel>
 // }
 
-// impl<T: SqliteVectorStoreTable + 'static> RetrivalAgent<T> {
-//     pub async fn new(
-//         openai_api_key: String,
-//         base_url: String,
-//         sqlite_vec_db: String,
-//         model_name: String,
-//         embedding_model_name: String,
-//         embedding_ndim: usize,
-//         sys_prompt: String,
-//         max_tokens: Option<u32>,
-//     ) -> Result<Self, anyhow::Error> {
-//         let conn = Connection::open(&sqlite_vec_db).await?;
-//         let openai_client = Client::from_url(&openai_api_key, &base_url);
-//         let embedding_model = openai_client.embedding_model_with_ndims(&embedding_model_name, embedding_ndim);
-//         let vector_store: SqliteVectorStore<EmbeddingModel, T> = SqliteVectorStore::new(conn, &embedding_model).await?;
-//         // let index = vector_store.index(embedding_model);
-//         let actual_max_tokens = max_tokens.unwrap_or(256);
-//         let agent = openai_client.agent(&model_name)
-//             .preamble(&sys_prompt)
-//             .max_tokens(actual_max_tokens.into())
-//             .dynamic_context(2, vector_store.index(embedding_model))  // `sample` means the number of top matched documents added to the agent context
-//             .build();
+pub struct RetrivalAgent;
 
-//         Ok(Self {
-//             openai_api_key,
-//             base_url,
-//             sqlite_vec_db,
-//             model_name,
-//             embedding_model_name,
-//             embedding_ndim,
-//             openai_client,
-//             agent,
-//             phantom: PhantomData,
-//         })
+impl RetrivalAgent {
+    pub async fn new(
+        sys_prompt: String,
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+        top_sample: Option<u8>
+    ) -> Result<Agent<CompletionModel>, anyhow::Error> {
+        let vcdb_from_env = VectorDBFromEnv::new().await.map_err(|_| {
+            RetrivalError::MissingApiKey("Env load error".to_string())
+        })?;
+        let conn = Connection::open(&vcdb_from_env.db_path)
+            .await
+            .map_err(|e| {
+                RetrivalError::VectorConn(e.to_string())
+            })?;
+        
+        let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
+        let embedding_model = openai_client.embedding_model_with_ndims(&vcdb_from_env.embedding_model_name, 
+            vcdb_from_env.embedding_ndim);
+        let vector_store: SqliteVectorStore<rig::providers::openai::EmbeddingModel, DriftBottle> = SqliteVectorStore::new(conn, &embedding_model)
+            .await
+            .map_err(|e| {
+                RetrivalError::VectorStore(e.to_string())
+            })?;
+        let vector_index = vector_store.index(embedding_model);
 
-//     }
+        let actual_max_tokens = max_tokens.unwrap_or(256);
+        let actual_temperature = temperature.unwrap_or(0.7);
+        let actual_top_n_sample: u8 = top_sample.unwrap_or(2);
+        let agent = openai_client.agent(&vcdb_from_env.model_name)
+            .preamble(&sys_prompt)
+            .max_tokens(actual_max_tokens.into())
+            .temperature(actual_temperature.into())
+            .dynamic_context(actual_top_n_sample.into(), 
+            vector_index)  // `sample` means the number of top matched documents added to the agent context
+            .build();
 
-// }
+        Ok(agent)
+
+    }
+
+}
 

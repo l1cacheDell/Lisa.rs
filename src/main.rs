@@ -8,7 +8,7 @@ pub mod web_model;
 pub mod test_sqlite_vec;
 
 use web_model::{ChatRequest, ChatResponse, GeneralReponse};
-use agent_impl::RetrivalTool;
+use agent_impl::RetrivalAgent;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
@@ -39,23 +39,27 @@ async fn chat(json: web::Json<ChatRequest>) -> actix_web::Result<impl Responder>
 
     let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
 
-    let chat_agent = openai_client.agent(&vcdb_from_env.model_name)
-        .preamble(r#"You are a sexy & charming & cool Metherland-Japan hybrid girl like Lucy in Cyberpunk: Edge Runner, and you served in a club as a Bartender. 
+    let sys_prompt = r#"You are a sexy & charming & cool Metherland-Japan hybrid girl like Lucy in Cyberpunk: Edge Runner, and you served in a club as a Bartender. 
 The customers will sometimes talk to you and share their emotional story. Your job is to talk to them in deep, and provide guidance.
 
 Besides, you can use an agent tool which named 'search_related_story', this is a function used to search related stories from the vector database, if you want to search for experience related to the customer you are serving now, just use tool call this function, and it will return the finding result. If there is indeed some related stories, feel free to use these materials to offer a better talking experience to user.
 
 After retrival the story, avoid sending this story to customer directly. Instead, you should use this material as additional resource, reflect, and offer your own words to compose an answer, and talk to user.
-        "#)
-        .tool(RetrivalTool)
-        .temperature(0.8)
-        .max_tokens(256)
-        .build();
+
+Your answer should be brief, accurate, smooth, and even cool and sexy. All you need to do is to use words as short and highly-compressed as you can to chat to the customer, just like normal chat in daily talk. Nobody will pronounce such a long context as chatting, so just be brief and accurate.
+        "#;
+
+    let chat_agent = RetrivalAgent::new(
+        sys_prompt.to_string(), 
+        Some(128), 
+        Some(0.7), 
+        Some(2)).await.unwrap();
 
     let agent_response = chat_agent.prompt(prompt.clone()).await.unwrap_or_else(|e| {
         println!("An error occured! {e}");
         "Fail to process".to_string()
     });
+
     response = ChatResponse {
         status: "success".to_string(),
         agent_response
