@@ -3,8 +3,9 @@ use serde::{de, Deserialize, Serialize};
 // chat api
 #[derive(Deserialize)]
 pub struct ChatRequest {
-    pub user_id: String,
-    pub content: String
+    pub wallet: String,
+    pub content: String,
+    pub tx_hash: String
 }
 
 #[derive(Serialize)]

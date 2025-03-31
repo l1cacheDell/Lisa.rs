@@ -4,11 +4,11 @@ use rig::completion::Prompt;
 
 pub mod db_schemas;
 pub mod agent_impl;
-pub mod web_model;
+pub mod request_model;
 pub mod test_sqlite_vec;
 
-use web_model::{ChatRequest, ChatResponse, GeneralReponse};
-use agent_impl::RetrivalAgent;
+use request_model::{ChatRequest, ChatResponse, GeneralReponse};
+use agent_impl::{RetrivalAgent, prompt_hub};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
@@ -25,35 +25,31 @@ async fn ping() -> actix_web::Result<impl Responder> {
 
 #[post("/api/chat")]
 async fn chat(json: web::Json<ChatRequest>) -> actix_web::Result<impl Responder> {
-    let user_id = &json.user_id;
+    let wallet = &json.wallet;
     let prompt = &json.content;
+    let tx_hash = &json.tx_hash;
 
     let mut response = ChatResponse {
         status: "success".to_string(),
         agent_response: "I don't have a response for that yet.".to_string(),
     };
 
-    let vcdb_from_env = db_schemas::VectorDBFromEnv::new()
-        .await
-        .unwrap();
+    let valid_tx: bool = true;
+    if !valid_tx {
+        response = ChatResponse {
+            status: "Fail to response".to_string(),
+            agent_response: "The transaction hash was verified as invalid, check your payment".to_string(),
+        };
+        return Ok(web::Json(response));
+    }
 
-    let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
-
-    let sys_prompt = r#"You are a sexy & charming & cool Metherland-Japan hybrid girl like Lucy in Cyberpunk: Edge Runner, and you served in a club as a Bartender. 
-The customers will sometimes talk to you and share their emotional story. Your job is to talk to them in deep, and provide guidance.
-
-Besides, you can use an agent tool which named 'search_related_story', this is a function used to search related stories from the vector database, if you want to search for experience related to the customer you are serving now, just use tool call this function, and it will return the finding result. If there is indeed some related stories, feel free to use these materials to offer a better talking experience to user.
-
-After retrival the story, avoid sending this story to customer directly. Instead, you should use this material as additional resource, reflect, and offer your own words to compose an answer, and talk to user.
-
-Your answer should be brief, accurate, smooth, and even cool and sexy. All you need to do is to use words as short and highly-compressed as you can to chat to the customer, just like normal chat in daily talk. Nobody will pronounce such a long context as chatting, so just be brief and accurate.
-        "#;
+    let sys_prompt = prompt_hub::CHAT_AGENT_SYS_PROMPT;
 
     let chat_agent = RetrivalAgent::new(
         sys_prompt.to_string(), 
         Some(128), 
-        Some(0.7), 
-        Some(2)).await.unwrap();
+        Some(0.9), 
+        Some(1)).await.unwrap();
 
     let agent_response = chat_agent.prompt(prompt.clone()).await.unwrap_or_else(|e| {
         println!("An error occured! {e}");
@@ -68,13 +64,13 @@ Your answer should be brief, accurate, smooth, and even cool and sexy. All you n
     Ok(web::Json(response))
 }
 
-#[post("/api/store_drift_bottle")]
-async fn store_drift_bottle(json: web::Json<web_model::StoreDriftBottleRequest>) -> actix_web::Result<impl Responder> {
+#[post("/api/store_drift")]
+async fn store_drift(json: web::Json<request_model::StoreDriftBottleRequest>) -> actix_web::Result<impl Responder> {
     let wallet = &json.wallet;
     let title = &json.title;
     let drift_bottle_content = &json.content;
 
-    let mut response = web_model::GeneralReponse {
+    let mut response = request_model::GeneralReponse {
         status: "success".to_string()
     };
 
@@ -82,12 +78,24 @@ async fn store_drift_bottle(json: web::Json<web_model::StoreDriftBottleRequest>)
     // currently we will implement the basic connection method, no ConnPool implemented.
 
     db_schemas::store_drift_vec(&wallet, &title, &drift_bottle_content).await.unwrap_or_else(|e| {
-        response = web_model::GeneralReponse {
+        response = request_model::GeneralReponse {
             status: format!("Error: {}", e)
         };
     });
     Ok(web::Json(response))
 }
+
+// #[get("/api/grade_drift")]
+// async fn grade_drift() -> actix_web::Result<impl Responder> {
+
+//     Ok(web::Json(response))
+// }
+
+// #[get("/api/retrive_drift")]
+// async fn retrive_drift() -> actix_web::Result<impl Responder> {
+
+//     Ok(web::Json(response))
+// }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -108,7 +116,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .service(ping)
             .service(chat)
-            .service(store_drift_bottle)
+            .service(store_drift)
             .wrap(Logger::default())
             .wrap(Logger::new("%a"))
     })
