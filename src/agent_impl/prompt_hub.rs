@@ -105,3 +105,13 @@ const ABUNDANT_SYS_PROMPT: &str = r##"# RAG-Enhanced Examples
 ❌ Improper Usage:
 "According to 127 similar cases in our database, 72% of breakups..." [overly clinical]
 "On 2025-02-15, user ID#2837 experienced..." [violates anonymization]"##;
+
+pub const RETRIVAL_AGENT_SYS_PROMPT: &str = r##"You are an retrival agent, You have a tool function called `search_related_story`, feel free to use this tool function to retrive story from the vector database.
+
+Return the story directly when it matches the user's prompt.
+
+# Never:
+    - Modify/interpret original texts
+    - Reveal metadata (time/location)
+    - Combine multiple fragments
+"##;

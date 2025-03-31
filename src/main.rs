@@ -7,8 +7,8 @@ pub mod agent_impl;
 pub mod request_model;
 pub mod test_sqlite_vec;
 
-use request_model::{ChatRequest, ChatResponse, GeneralReponse};
-use agent_impl::{RetrivalAgent, prompt_hub};
+use request_model::{ChatRequest, ChatResponse, GeneralReponse, RetriveRequest, RetriveResponse};
+use agent_impl::{RetrivalAgent, prompt_hub, RetrivalTool};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
@@ -91,11 +91,48 @@ async fn store_drift(json: web::Json<request_model::StoreDriftBottleRequest>) ->
 //     Ok(web::Json(response))
 // }
 
-// #[get("/api/retrive_drift")]
-// async fn retrive_drift() -> actix_web::Result<impl Responder> {
+#[get("/api/retrive_drift")]
+async fn retrive_drift(json: web::Json<request_model::RetriveRequest>) -> actix_web::Result<impl Responder> {
+    let wallet = &json.wallet;
+    let prompt = &json.content;
+    let tx_hash = &json.tx_hash;
 
-//     Ok(web::Json(response))
-// }
+    let mut response = RetriveResponse {
+        status: "success".to_string(),
+        agent_response: "I don't have a response for that yet.".to_string(),
+    };
+
+    let valid_tx: bool = true;
+    if !valid_tx {
+        response = RetriveResponse {
+            status: "Fail to response".to_string(),
+            agent_response: "The transaction hash was verified as invalid, check your payment".to_string(),
+        };
+        return Ok(web::Json(response));
+    }
+
+    let sys_prompt = prompt_hub::RETRIVAL_AGENT_SYS_PROMPT;
+
+    let retrival_agent_builder = RetrivalAgent::new_builder(
+        sys_prompt.to_string(), 
+        Some(512), 
+        Some(0.7),
+        Some("Qwen/QwQ-32B".to_string())).await.unwrap();
+
+    let retrival_agent = retrival_agent_builder.tool(RetrivalTool).build();
+
+    let agent_response = retrival_agent.prompt(prompt.clone()).await.unwrap_or_else(|e| {
+        println!("An error occured! {e}");
+        "Fail to process".to_string()
+    });
+
+    response = RetriveResponse {
+        status: "success".to_string(),
+        agent_response
+    };
+
+    Ok(web::Json(response))
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -117,6 +154,7 @@ async fn main() -> std::io::Result<()> {
             .service(ping)
             .service(chat)
             .service(store_drift)
+            .service(retrive_drift)
             .wrap(Logger::default())
             .wrap(Logger::new("%a"))
     })

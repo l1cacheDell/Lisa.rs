@@ -3,7 +3,7 @@ use serde_json::json;
 
 use tokio_rusqlite::Connection;
 use rig::{
-    agent::Agent, providers::openai::{Client, CompletionModel, EmbeddingModel}, 
+    agent::{Agent, AgentBuilder}, providers::openai::{Client, CompletionModel, EmbeddingModel}, 
     vector_store::{self, VectorStoreIndex}
 };
 use rig::completion::ToolDefinition;
@@ -155,6 +155,30 @@ impl RetrivalAgent {
 
         Ok(agent)
 
+    }
+
+    pub async fn new_builder(
+        sys_prompt: String,
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+        model_name: Option<String>
+    ) -> Result<AgentBuilder<CompletionModel>, anyhow::Error> {
+        let vcdb_from_env = VectorDBFromEnv::new().await.map_err(|_| {
+            RetrivalError::MissingApiKey("Env load error".to_string())
+        })?;
+        
+        let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
+
+        let actual_max_tokens = max_tokens.unwrap_or(256);
+        let actual_temperature = temperature.unwrap_or(0.7);
+        let actual_model_name = model_name.unwrap_or(vcdb_from_env.model_name.to_string());
+
+        let agent = openai_client.agent(&actual_model_name)
+            .preamble(&sys_prompt)
+            .max_tokens(actual_max_tokens.into())
+            .temperature(actual_temperature.into());
+
+        Ok(agent)
     }
 
 }

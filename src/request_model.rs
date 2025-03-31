@@ -26,3 +26,17 @@ pub struct StoreDriftBottleRequest {
 pub struct GeneralReponse {
     pub status: String
 }
+
+// retrive drift bottle api
+#[derive(Deserialize)]
+pub struct RetriveRequest {
+    pub wallet: String,
+    pub content: String,
+    pub tx_hash: String
+}
+
+#[derive(Serialize)]
+pub struct RetriveResponse {
+    pub status: String,
+    pub agent_response: String
+}
