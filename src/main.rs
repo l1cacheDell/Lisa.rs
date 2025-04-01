@@ -7,7 +7,7 @@ pub mod agent_impl;
 pub mod request_model;
 pub mod test_sqlite_vec;
 
-use request_model::{ChatRequest, ChatResponse, GeneralReponse, RetriveRequest, RetriveResponse};
+use request_model::{ChatRequest, ChatResponse, GeneralReponse, RetriveRequest, RetriveResponse, GradeBottleRequest, GradeBottleResponse};
 use agent_impl::{RetrivalAgent, prompt_hub, RetrivalTool};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
@@ -27,21 +27,11 @@ async fn ping() -> actix_web::Result<impl Responder> {
 async fn chat(json: web::Json<ChatRequest>) -> actix_web::Result<impl Responder> {
     let wallet = &json.wallet;
     let prompt = &json.content;
-    let tx_hash = &json.tx_hash;
 
     let mut response = ChatResponse {
         status: "success".to_string(),
         agent_response: "I don't have a response for that yet.".to_string(),
     };
-
-    let valid_tx: bool = true;
-    if !valid_tx {
-        response = ChatResponse {
-            status: "Fail to response".to_string(),
-            agent_response: "The transaction hash was verified as invalid, check your payment".to_string(),
-        };
-        return Ok(web::Json(response));
-    }
 
     let sys_prompt = prompt_hub::CHAT_AGENT_SYS_PROMPT;
 
@@ -78,24 +68,31 @@ async fn store_drift(json: web::Json<request_model::StoreDriftBottleRequest>) ->
     // currently we will implement the basic connection method, no ConnPool implemented.
 
     db_schemas::store_drift_vec(&wallet, &title, &drift_bottle_content).await.unwrap_or_else(|e| {
-        response = request_model::GeneralReponse {
+        response = GeneralReponse {
             status: format!("Error: {}", e)
         };
     });
     Ok(web::Json(response))
 }
 
-// #[get("/api/grade_drift")]
-// async fn grade_drift() -> actix_web::Result<impl Responder> {
+#[get("/api/grade_drift")]
+async fn grade_drift(json: web::Json<GradeBottleRequest>) -> actix_web::Result<impl Responder> {
+    let title = &json.title;
+    let tx_hash = &json.tx_hash;
+    let content = &json.content;
 
-//     Ok(web::Json(response))
-// }
+    let mut response = GradeBottleResponse {
+        status: "OK".to_string(),
+        score: 98
+    };
+
+    Ok(web::Json(response))
+}
 
 #[get("/api/retrive_drift")]
-async fn retrive_drift(json: web::Json<request_model::RetriveRequest>) -> actix_web::Result<impl Responder> {
+async fn retrive_drift(json: web::Json<RetriveRequest>) -> actix_web::Result<impl Responder> {
     let wallet = &json.wallet;
     let prompt = &json.content;
-    let tx_hash = &json.tx_hash;
 
     let mut response = RetriveResponse {
         status: "success".to_string(),

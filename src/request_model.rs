@@ -5,7 +5,7 @@ use serde::{de, Deserialize, Serialize};
 pub struct ChatRequest {
     pub wallet: String,
     pub content: String,
-    pub tx_hash: String
+
 }
 
 #[derive(Serialize)]
@@ -32,11 +32,25 @@ pub struct GeneralReponse {
 pub struct RetriveRequest {
     pub wallet: String,
     pub content: String,
-    pub tx_hash: String
 }
 
 #[derive(Serialize)]
 pub struct RetriveResponse {
     pub status: String,
     pub agent_response: String
+}
+
+// grade drift bottle score api
+#[derive(Deserialize)]
+pub struct GradeBottleRequest {
+    pub wallet: String,
+    pub title: String,
+    pub content: String,
+    pub tx_hash: String
+}
+
+#[derive(Serialize)]
+pub struct GradeBottleResponse {
+    pub status: String,
+    pub score: u8   // 0-100
 }
