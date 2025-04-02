@@ -97,8 +97,10 @@ impl Tool for RetrivalTool {
 
         let mut output = String::new();
         for (_i, doc) in results.iter().enumerate() {
+            println!("Doc sim: {}", doc.0);
             if doc.0 > 0.7 {
-                output.push_str(&format!("**User**: {}\n**title**: {}\n**content**: {}\n", doc.2.wallet, doc.2.title, doc.2.content));
+                output.push_str(&format!("**id**: {}\n**User**: {}\n**title**: {}\n**content**: {}", doc.2.id, doc.2.wallet, doc.2.title, doc.2.content));
+                output.push_str("\n\n\n");
             }
         }
 
@@ -109,10 +111,6 @@ impl Tool for RetrivalTool {
         Ok(output)
     }
 }
-    
-// pub struct RetrivalAgent {
-//     agent: Agent<CompletionModel>
-// }
 
 pub struct RetrivalAgent;
 

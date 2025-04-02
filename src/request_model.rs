@@ -1,4 +1,5 @@
 use serde::{de, Deserialize, Serialize};
+use crate::db_schemas::DocInfo;
 
 // chat api
 #[derive(Deserialize)]
@@ -37,7 +38,7 @@ pub struct RetriveRequest {
 #[derive(Serialize)]
 pub struct RetriveResponse {
     pub status: String,
-    pub agent_response: String
+    pub retrive_results: Vec<DocInfo>
 }
 
 // grade drift bottle score api

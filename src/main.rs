@@ -96,14 +96,14 @@ async fn retrive_drift(json: web::Json<RetriveRequest>) -> actix_web::Result<imp
 
     let mut response = RetriveResponse {
         status: "success".to_string(),
-        agent_response: "I don't have a response for that yet.".to_string(),
+        retrive_results: Vec::new(),
     };
 
     let valid_tx: bool = true;
     if !valid_tx {
         response = RetriveResponse {
             status: "Fail to response".to_string(),
-            agent_response: "The transaction hash was verified as invalid, check your payment".to_string(),
+            retrive_results: Vec::new(),
         };
         return Ok(web::Json(response));
     }
@@ -123,9 +123,23 @@ async fn retrive_drift(json: web::Json<RetriveRequest>) -> actix_web::Result<imp
         "Fail to process".to_string()
     });
 
+    let doc_info = db_schemas::parse_markdown_text(&agent_response).unwrap_or_else(|e| {
+        println!("An Error occured during parsing: {}", e);
+        Vec::new()
+    });
+
+    if doc_info.len() == 0 {
+        response = RetriveResponse {
+            status: "Sorry, we haven't found any similar exprience as you have now.".to_string(),
+            retrive_results: doc_info
+        };
+
+        return Ok(web::Json(response));
+    }
+
     response = RetriveResponse {
         status: "success".to_string(),
-        agent_response
+        retrive_results: doc_info
     };
 
     Ok(web::Json(response))

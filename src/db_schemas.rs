@@ -4,7 +4,7 @@ use rig::{
     Embed
 };
 use rig_sqlite::{Column, ColumnValue, SqliteVectorIndex, SqliteVectorStore, SqliteVectorStoreTable};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio_rusqlite::Connection;
 use regex::Regex;
 
@@ -21,6 +21,8 @@ pub struct DriftBottle {
     #[embed]
     pub content: String,
 }
+
+
 
 impl SqliteVectorStoreTable for DriftBottle {
     fn name() -> &'static str {
@@ -211,4 +213,52 @@ pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result
     vector_store.add_rows(embeddings).await?;
 
     Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DocInfo {
+    pub id: String,
+    pub user: String,
+    pub title: String,
+    pub content: String,
+}
+
+pub fn parse_markdown_text(text: &str) -> Result<Vec<DocInfo>, String> {
+    let mut cleaned_chunk = text.replace("\\n", "\n");
+    cleaned_chunk = cleaned_chunk.replace("\"", "");
+    let vec_texts = cleaned_chunk.split("\n\n\n");
+
+    let id_re = Regex::new(r"\*\*id\*\*: (.+)").unwrap();
+    let user_re = Regex::new(r"\*\*User\*\*: (.+)").unwrap();
+    let title_re = Regex::new(r"\*\*title\*\*: (.+)").unwrap();
+    let content_re = Regex::new(r"(?s)\*\*content\*\*: (.+)").unwrap();  // 使用 (?s) 让 . 匹配换行
+
+    let mut results: Vec<DocInfo> = Vec::new();
+
+    for chunk in vec_texts {
+        if !chunk.contains("**id**") || !chunk.contains("**User**") || !chunk.contains("**title**") || !chunk.contains("**content**") {
+            continue;
+        }
+        let id = id_re.captures(chunk)
+            .and_then(|c| c.get(1)).map(|m| m.as_str().to_string())
+            .ok_or("ID 匹配失败")?;
+        let user = user_re.captures(chunk)
+            .and_then(|c| c.get(1)).map(|m| m.as_str().to_string())
+            .ok_or("user 匹配失败")?;
+        let title = title_re.captures(chunk)
+            .and_then(|c| c.get(1)).map(|m| m.as_str().to_string())
+            .ok_or("title 匹配失败")?;
+        let content = content_re.captures(chunk)
+            .and_then(|c| c.get(1)).map(|m| m.as_str().to_string())
+            .ok_or("content 匹配失败")?;
+        
+        results.push(DocInfo {
+            id,
+            user,
+            title,
+            content
+        })
+    }
+
+    Ok(results)
 }
