@@ -21,6 +21,13 @@ use sqlite_vec::sqlite3_vec_init;
 use futures::{future::ok, stream::once};
 use futures::{StreamExt}; // 关键引入
 
+#[get("/")]
+async fn entrance() -> actix_web::Result<impl Responder> {
+    Ok(web::Json(GeneralReponse {
+        status: "Welcome to emptylab!".to_string()
+    }))
+}
+
 #[get("/api/ping")]
 async fn ping() -> actix_web::Result<impl Responder> {
     Ok(web::Json(GeneralReponse {
@@ -186,6 +193,7 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
+            .service(entrance)
             .service(ping)
             .service(chat)
             .service(store_drift)
