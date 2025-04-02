@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat API Demo</title>
+    <style>
+        #output {
+            font-family: monospace;
+            white-space: pre-wrap;
+            border: 1px solid #ddd;
+            padding: 10px;
+            min-height: 200px;
+            background: #f9f9f9;
+            margin-top: 10px;
+        }
+        .typing-cursor {
+            display: inline-block;
+            width: 10px;
+            height: 1em;
+            background: #333;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        #userInput {
+            width: 300px;
+            padding: 8px;
+        }
+        button {
+            padding: 8px 15px;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Streaming Demo</h1>
+    <div>
+        <input type="text" id="wallet" placeholder="Your wallet address" value="0x123...abc">
+        <input type="text" id="userInput" placeholder="Type your message...">
+        <button id="sendBtn">Send</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        document.getElementById('sendBtn').addEventListener('click', sendChatRequest);
+
+        async function sendChatRequest() {
+            const wallet = document.getElementById('wallet').value;
+            const prompt = document.getElementById('userInput').value;
+            const output = document.getElementById('output');
+            
+            if (!prompt.trim()) {
+                alert("Please enter a message");
+                return;
+            }
+
+            output.innerHTML = '<span class="typing-cursor"></span>';
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        wallet: wallet,
+                        content: prompt
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // 更新显示（带光标）
+                    output.innerHTML = buffer + '<span class="typing-cursor"></span>';
+                    
+                    // 自动滚动到底部
+                    output.scrollTop = output.scrollHeight;
+                }
+                
+            } catch (error) {
+                output.innerHTML = `Error: ${error.message}`;
+                console.error('Fetch error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

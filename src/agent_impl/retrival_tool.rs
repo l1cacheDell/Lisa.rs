@@ -76,7 +76,7 @@ impl Tool for RetrivalTool {
         let openai_client = Client::from_url(&vcdb_from_env.openai_api_key, &vcdb_from_env.base_url);
         let embedding_model = openai_client.embedding_model_with_ndims(&vcdb_from_env.embedding_model_name, 
             vcdb_from_env.embedding_ndim);
-        let vector_store: SqliteVectorStore<rig::providers::openai::EmbeddingModel, DriftBottle> = SqliteVectorStore::new(conn, &embedding_model)
+        let vector_store: SqliteVectorStore<EmbeddingModel, DriftBottle> = SqliteVectorStore::new(conn, &embedding_model)
             .await
             .map_err(|e| {
                 RetrivalError::VectorStore(e.to_string())

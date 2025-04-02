@@ -6,7 +6,6 @@ use crate::db_schemas::DocInfo;
 pub struct ChatRequest {
     pub wallet: String,
     pub content: String,
-
 }
 
 #[derive(Serialize)]

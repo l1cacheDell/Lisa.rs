@@ -1,6 +1,7 @@
 use dotenvy::dotenv;
 use rig::providers::openai::Client;
 use rig::completion::Prompt;
+use rig::streaming::{StreamingPrompt, StreamingChoice};
 
 pub mod db_schemas;
 pub mod agent_impl;
@@ -10,11 +11,15 @@ pub mod test_sqlite_vec;
 use request_model::{ChatRequest, ChatResponse, GeneralReponse, RetriveRequest, RetriveResponse, GradeBottleRequest, GradeBottleResponse};
 use agent_impl::{RetrivalAgent, prompt_hub, RetrivalTool};
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Error};
 use actix_web::middleware::Logger;
+use actix_cors::Cors;
 use env_logger::Env;
 use rusqlite::ffi::sqlite3_auto_extension;
 use sqlite_vec::sqlite3_vec_init;
+
+use futures::{future::ok, stream::once};
+use futures::{StreamExt}; // 关键引入
 
 #[get("/api/ping")]
 async fn ping() -> actix_web::Result<impl Responder> {
@@ -23,15 +28,11 @@ async fn ping() -> actix_web::Result<impl Responder> {
     }))
 }
 
+// this API will be streaming response
 #[post("/api/chat")]
-async fn chat(json: web::Json<ChatRequest>) -> actix_web::Result<impl Responder> {
+async fn chat(json: web::Json<ChatRequest>) -> HttpResponse {
     let wallet = &json.wallet;
     let prompt = &json.content;
-
-    let mut response = ChatResponse {
-        status: "success".to_string(),
-        agent_response: "I don't have a response for that yet.".to_string(),
-    };
 
     let sys_prompt = prompt_hub::CHAT_AGENT_SYS_PROMPT;
 
@@ -41,17 +42,28 @@ async fn chat(json: web::Json<ChatRequest>) -> actix_web::Result<impl Responder>
         Some(0.9), 
         Some(1)).await.unwrap();
 
-    let agent_response = chat_agent.prompt(prompt.clone()).await.unwrap_or_else(|e| {
-        println!("An error occured! {e}");
-        "Fail to process".to_string()
-    });
+    // TODO: we need to use `stream_chat`` interface, and figure out one way to store the chat history of a single user.
+    let stream = chat_agent.stream_prompt(prompt)
+        .await
+        .unwrap();
 
-    response = ChatResponse {
-        status: "success".to_string(),
-        agent_response
-    };
+    let converted_stream = stream
+        .map(|result| { // 使用 StreamExt 的 map
+            match result {
+                Ok(choice) => match choice {
+                    StreamingChoice::Message(text) => Ok(web::Bytes::from(text)),
+                    StreamingChoice::ToolCall(_, _, _) => 
+                        Err(actix_web::error::ErrorBadRequest("Tool calls not supported")),
+                },
+                Err(e) => 
+                    Err(actix_web::error::ErrorInternalServerError(e)),
+            }
+        })
+        .boxed(); // 统一流类型
 
-    Ok(web::Json(response))
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .streaming(converted_stream)
 }
 
 #[post("/api/store_drift")]
@@ -78,8 +90,14 @@ async fn store_drift(json: web::Json<request_model::StoreDriftBottleRequest>) ->
 #[get("/api/grade_drift")]
 async fn grade_drift(json: web::Json<GradeBottleRequest>) -> actix_web::Result<impl Responder> {
     let title = &json.title;
-    let tx_hash = &json.tx_hash;
     let content = &json.content;
+    let tx_hash = &json.tx_hash;
+
+    // 1. verify the tx_hash
+
+    // 2. save these content to vec db, using function
+
+    // 3. grade this content, return score.
 
     let mut response = GradeBottleResponse {
         status: "OK".to_string(),
@@ -161,6 +179,12 @@ async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(Env::default().default_filter_or("info"));
 
     HttpServer::new(|| {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allowed_methods(vec!["GET", "POST"])
+            .allow_any_header()
+            .max_age(3600);
+
         App::new()
             .service(ping)
             .service(chat)
@@ -168,6 +192,7 @@ async fn main() -> std::io::Result<()> {
             .service(retrive_drift)
             .wrap(Logger::default())
             .wrap(Logger::new("%a"))
+            .wrap(cors)
     })
     .workers(2)
     .bind((IPADDRESS, port))?
