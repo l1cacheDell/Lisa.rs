@@ -58,7 +58,8 @@
             output.innerHTML = '<span class="typing-cursor"></span>';
             
             try {
-                const response = await fetch('http://localhost:8080/api/chat', {
+                let remote_url = "'https://www.emptylab.org/api/chat'";
+                const response = await fetch('http:/localhost:8080/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

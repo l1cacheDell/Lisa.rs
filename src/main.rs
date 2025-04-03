@@ -179,7 +179,7 @@ async fn main() -> std::io::Result<()> {
         sqlite3_auto_extension(Some(std::mem::transmute(sqlite3_vec_init as *const ())));
     }
 
-    const IPADDRESS: &str = "localhost";
+    const IPADDRESS: &str = "0.0.0.0";
     let port: u16 = std::env::var("PORT").unwrap_or("8080".to_string()).parse::<u16>().expect("Invalid port number");
     println!("Server will be listening on http://{}:{}", IPADDRESS, port);
 
