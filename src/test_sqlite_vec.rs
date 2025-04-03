@@ -1,10 +1,9 @@
 use rig::{
-    embeddings::EmbeddingsBuilder,
     providers::openai::Client,
     vector_store::VectorStoreIndex,
-    Embed, OneOrMany,
+    Embed
 };
-use rig_sqlite::{Column, ColumnValue, SqliteVectorIndex, SqliteVectorStore, SqliteVectorStoreTable};
+use rig_sqlite::{Column, ColumnValue, SqliteVectorStore, SqliteVectorStoreTable};
 use rusqlite::ffi::sqlite3_auto_extension;
 use serde::Deserialize;
 use sqlite_vec::sqlite3_vec_init;
@@ -64,7 +63,7 @@ pub async fn launch_sqlite_vec(openai_client: &Client, embedding_model: &str) ->
     // Initialize SQLite vector store
     let vector_store: SqliteVectorStore<rig::providers::openai::EmbeddingModel, Document> = SqliteVectorStore::new(conn, &model).await?;
 
-    let documents = vec![
+    let _documents = vec![
         Document {
             id: "doc0".to_string(),
             content: "Definition of a *flurbo*: A flurbo is a green alien that lives on cold planets".to_string(),
@@ -79,10 +78,10 @@ pub async fn launch_sqlite_vec(openai_client: &Client, embedding_model: &str) ->
         },
     ];
 
-    let embeddings = EmbeddingsBuilder::new(model.clone())
-        .documents(documents)?
-        .build()
-        .await?;
+    // let embeddings = EmbeddingsBuilder::new(model.clone())
+    //     .documents(documents)?
+    //     .build()
+    //     .await?;
 
     // Add embeddings to vector store
     // let store_res = vector_store.add_rows(embeddings)

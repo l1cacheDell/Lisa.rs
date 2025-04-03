@@ -1,5 +1,4 @@
 use dotenvy::dotenv;
-use rig::providers::openai::Client;
 use rig::completion::Prompt;
 use rig::streaming::{StreamingPrompt, StreamingChoice};
 
@@ -7,19 +6,22 @@ pub mod db_schemas;
 pub mod agent_impl;
 pub mod request_model;
 pub mod test_sqlite_vec;
+pub mod aptos_utils;
 
-use request_model::{ChatRequest, ChatResponse, GeneralReponse, RetriveRequest, RetriveResponse, GradeBottleRequest, GradeBottleResponse};
+use request_model::{ChatRequest, GeneralReponse, RetriveRequest, RetriveResponse, GradeBottleRequest, GradeBottleResponse};
 use agent_impl::{RetrivalAgent, prompt_hub, RetrivalTool};
+use aptos_utils::verify_tx;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Error};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::middleware::Logger;
 use actix_cors::Cors;
 use env_logger::Env;
 use rusqlite::ffi::sqlite3_auto_extension;
 use sqlite_vec::sqlite3_vec_init;
 
-use futures::{future::ok, stream::once};
-use futures::{StreamExt}; // 关键引入
+use futures::StreamExt; // 关键引入
+
+
 
 #[get("/")]
 async fn entrance() -> actix_web::Result<impl Responder> {
@@ -38,14 +40,19 @@ async fn ping() -> actix_web::Result<impl Responder> {
 // this API will be streaming response
 #[post("/api/chat")]
 async fn chat(json: web::Json<ChatRequest>) -> HttpResponse {
-    let wallet = &json.wallet;
+    let _wallet = &json.wallet;
     let prompt = &json.content;
 
     let sys_prompt = prompt_hub::CHAT_AGENT_SYS_PROMPT;
 
+    let mut max_tokens = 64;
+    if db_schemas::count_sequence_len(prompt) > 64 {
+        max_tokens = 128;
+    }
+
     let chat_agent = RetrivalAgent::new(
         sys_prompt.to_string(), 
-        Some(128), 
+        Some(max_tokens), 
         Some(0.9), 
         Some(1)).await.unwrap();
 
@@ -99,24 +106,31 @@ async fn grade_drift(json: web::Json<GradeBottleRequest>) -> actix_web::Result<i
     let title = &json.title;
     let content = &json.content;
     let tx_hash = &json.tx_hash;
-
-    // 1. verify the tx_hash
-
-    // 2. save these content to vec db, using function
-
-    // 3. grade this content, return score.
-
     let mut response = GradeBottleResponse {
         status: "OK".to_string(),
         score: 98
     };
+
+    // 1. verify the tx_hash
+    let valid = verify_tx(tx_hash).await.unwrap_or(false);
+    if !valid {
+        response = GradeBottleResponse {
+            status: "transaction invalid".to_string(),
+            score: -1
+        };
+        return Ok(web::Json(response));
+    }
+    // 2. save these content to vec db, using function
+
+    // 3. grade this content, return score.
+
 
     Ok(web::Json(response))
 }
 
 #[get("/api/retrive_drift")]
 async fn retrive_drift(json: web::Json<RetriveRequest>) -> actix_web::Result<impl Responder> {
-    let wallet = &json.wallet;
+    let _wallet = &json.wallet;
     let prompt = &json.content;
 
     let mut response = RetriveResponse {

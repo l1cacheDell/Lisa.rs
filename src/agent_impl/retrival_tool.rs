@@ -4,12 +4,12 @@ use serde_json::json;
 use tokio_rusqlite::Connection;
 use rig::{
     agent::{Agent, AgentBuilder}, providers::openai::{Client, CompletionModel, EmbeddingModel}, 
-    vector_store::{self, VectorStoreIndex}
+    vector_store::VectorStoreIndex
 };
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 
-use rig_sqlite::{SqliteVectorStore, SqliteVectorStoreTable};
+use rig_sqlite::SqliteVectorStore;
 use crate::db_schemas::{DriftBottle, VectorDBFromEnv};
 
 // sqlite vec, and retrival tool

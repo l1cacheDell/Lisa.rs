@@ -3,7 +3,7 @@ use rig::{
     providers::openai::Client,
     Embed
 };
-use rig_sqlite::{Column, ColumnValue, SqliteVectorIndex, SqliteVectorStore, SqliteVectorStoreTable};
+use rig_sqlite::{Column, ColumnValue, SqliteVectorStore, SqliteVectorStoreTable};
 use serde::{Deserialize, Serialize};
 use tokio_rusqlite::Connection;
 use regex::Regex;
@@ -133,6 +133,12 @@ impl VectorDBFromEnv {
             model_name
         })
     }
+}
+
+pub fn count_sequence_len(input_str: &str) -> usize {
+    let word_re = Regex::new(r"\b[\w\p{P}]+\b").unwrap();
+    let words: Vec<&str> = word_re.find_iter(input_str).map(|mat| mat.as_str()).collect();
+    words.len()
 }
 
 pub async fn store_drift_vec(wallet: &str, title: &str, content: &str) -> Result<(), anyhow::Error>{
