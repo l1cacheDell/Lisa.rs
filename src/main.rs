@@ -202,7 +202,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::new("%a"))
             .wrap(cors)
     })
-    .workers(2)
+    .workers(4)
     .bind((IPADDRESS, port))?
     .run()
     .await
