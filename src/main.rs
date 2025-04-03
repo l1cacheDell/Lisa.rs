@@ -193,6 +193,7 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
+            .wrap(cors)
             .service(entrance)
             .service(ping)
             .service(chat)
@@ -200,7 +201,6 @@ async fn main() -> std::io::Result<()> {
             .service(retrive_drift)
             .wrap(Logger::default())
             .wrap(Logger::new("%a"))
-            .wrap(cors)
     })
     .workers(4)
     .bind((IPADDRESS, port))?
