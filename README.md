@@ -24,6 +24,9 @@ DB_PATH="data/vector_store.db"      # 这个建议default, 就用这个路径文
 git clone https://github.com/l1cacheDell/Lisa.rs.git
 cd Lisa.rs
 
+sudo apt install pkg-config libssl-dev
+sudo apt install libudev-dev
+
 # build this project
 cargo build
 

@@ -81,8 +81,10 @@
             try {
                 // 先显示加载状态
                 output.innerHTML = '正在连接服务器...<span class="typing-cursor"></span>';
+                let remote_url = 'https://www.emptylab.org/api/chat';
+                let local_url = 'http://localhost:8080/api/chat';
 
-                const response = await fetch('https://www.emptylab.org/api/chat', {
+                const response = await fetch(local_url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -1,3 +1,5 @@
+use std::os::linux::raw;
+
 use dotenvy::dotenv;
 use rig::completion::Prompt;
 use rig::streaming::{StreamingPrompt, StreamingChoice};
@@ -12,13 +14,14 @@ use request_model::{ChatRequest, GeneralReponse, RetriveRequest, RetriveResponse
 use agent_impl::{RetrivalAgent, prompt_hub, RetrivalTool};
 use aptos_utils::verify_tx;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Error};
 use actix_web::middleware::Logger;
 use actix_cors::Cors;
 use env_logger::Env;
 use rusqlite::ffi::sqlite3_auto_extension;
 use sqlite_vec::sqlite3_vec_init;
 
+use futures::{future::ok, stream::once};
 use futures::StreamExt; // 关键引入
 
 
@@ -56,28 +59,35 @@ async fn chat(json: web::Json<ChatRequest>) -> HttpResponse {
         Some(0.9), 
         Some(1)).await.unwrap();
 
-    // TODO: we need to use `stream_chat`` interface, and figure out one way to store the chat history of a single user.
-    let stream = chat_agent.stream_prompt(prompt)
-        .await
-        .unwrap();
+    // TODO: we need to use `stream_chat` interface, and figure out one way to store the chat history of a single user.
+    let raw_response = chat_agent.stream_prompt(prompt)
+        .await;
 
-    let converted_stream = stream
-        .map(|result| { // 使用 StreamExt 的 map
-            match result {
-                Ok(choice) => match choice {
-                    StreamingChoice::Message(text) => Ok(web::Bytes::from(text)),
-                    StreamingChoice::ToolCall(_, _, _) => 
-                        Err(actix_web::error::ErrorBadRequest("Tool calls not supported")),
-                },
-                Err(e) => 
-                    Err(actix_web::error::ErrorInternalServerError(e)),
-            }
-        })
-        .boxed(); // 统一流类型
+    match raw_response {
+        Ok(stream) => {
+            let converted_stream = stream
+                .map(|result| { // 使用 StreamExt 的 map
+                    match result {
+                        Ok(choice) => match choice {
+                            StreamingChoice::Message(text) => Ok(web::Bytes::from(text)),
+                            StreamingChoice::ToolCall(_, _, _) => 
+                                Err(actix_web::error::ErrorBadRequest("Tool calls not supported")),
+                        },
+                        Err(e) => 
+                            Err(actix_web::error::ErrorInternalServerError(e)),
+                    }
+                })
+                .boxed(); // 统一流类型
 
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .streaming(converted_stream)
+            HttpResponse::Ok()
+                .content_type("application/json")
+                .streaming(converted_stream)
+        },
+        Err(e) => {
+            eprintln!("Full error: {:#?}", e);  // 打印完整错误结构
+            HttpResponse::InternalServerError().body(format!("Backend error: {}", e))
+        }
+    }
 }
 
 #[post("/api/store_drift")]
