@@ -1,5 +1,6 @@
-use std::os::linux::raw;
+// use std::os::linux::raw;
 
+use rig::providers::openai;
 use dotenvy::dotenv;
 use rig::completion::Prompt;
 use rig::streaming::{StreamingPrompt, StreamingChoice};
@@ -53,11 +54,19 @@ async fn chat(json: web::Json<ChatRequest>) -> HttpResponse {
         max_tokens = 128;
     }
 
-    let chat_agent = RetrivalAgent::new(
+    // let chat_agent = RetrivalAgent::new(
+    //     sys_prompt.to_string(), 
+    //     Some(max_tokens), 
+    //     Some(0.9), 
+    //     Some(1)).await.unwrap();
+
+    let chat_agent_builder = RetrivalAgent::new_builder(
         sys_prompt.to_string(), 
         Some(max_tokens), 
         Some(0.9), 
-        Some(1)).await.unwrap();
+        Some("deepseek-ai/DeepSeek-V3".to_string()));
+
+    let chat_agent = chat_agent_builder.await.unwrap().build();
 
     // TODO: we need to use `stream_chat` interface, and figure out one way to store the chat history of a single user.
     let raw_response = chat_agent.stream_prompt(prompt)
